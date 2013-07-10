@@ -26,7 +26,7 @@ var rest = require('restler');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
-var URL_DEFAULT = null; //"http://polar-everglades-4966.herokuapp.com/";
+var URL_DEFAULT = null;
 var CHECKSFILE_DEFAULT = "checks.json";
 
 var assertFileExists = function(infile) {
@@ -51,33 +51,23 @@ var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
 };
 
-var cheerioHtmlContent = function(htmlcontent) {
-    return cheerio.load(htmlcontent);
-};
-
 var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
-    var checks = loadChecks(checksfile).sort();
-    var out = {};
-    for(var ii in checks) {
-        var present = $(checks[ii]).length > 0;
-        out[checks[ii]] = present;
-    }
-    return out;
-};
+var checkHtmlFile = function(htmlfile, checksfile, callback) {
+    var data = fs.readFileSync(htmlfile);
+    callback(data, checksfile);
+}
 
-var checkURL = function(url, callback) {
+var checkURL = function(url, checksfile, callback) {
     rest.get(url).once('complete', function(data) {
-                  return callback(data); });
+                  return callback(data, checksfile); });
 };
 
-var checkURL_callback = function(data) {
+var callback = function(data, checksfile) {
     $ = cheerio.load(data);
-    var checks = loadChecks(program.checks).sort();
+    var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
         var present = $(checks[ii]).length > 0;
@@ -102,14 +92,14 @@ if(require.main == module) {
         .parse(process.argv);
     
     if (program.url) {
-        checkURL(program.url, checkURL_callback);
+        checkURL(program.url, program.checks, callback);
         return;
     } 
     else if (program.file) {
-        var checkJson = checkHtmlFile(program.file, program.checks);
-        var outJson = JSON.stringify(checkJson, null, 4);
-        console.log(outJson);
+        checkHtmlFile(program.file, program.checks, callback);
+        return;
     }
 } else {
     exports.checkHtmlFile = checkHtmlFile;
+    exports.checkUrl = checkURL;
 }
